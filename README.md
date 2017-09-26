@@ -23,6 +23,7 @@ The GSM Module is wired as followed:
 * VCC5.0 to 5V Power Supply
 * GND of GSM to both Arduino GND & 5V power supply GND
 * PWK of GSM to VCC5.0 of GSM
+* A 100k resistor is also needed between the VCC5.0 & the reset pin
 
 #### Testing Connection
 
