@@ -1,6 +1,6 @@
 # GSM-A6 Readme
 This library works for this GSM, it may or may not also work with other modules:
-![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/images/gsm.jpg)
+![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm.jpg)
 
 ## Basic GSM Information
 
