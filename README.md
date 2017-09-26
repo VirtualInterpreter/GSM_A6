@@ -1,8 +1,8 @@
 # GSM-A6 Readme
 This library works for this GSM, it may or may not also work with other modules:
-![Picture of GSM Module](https://)
+![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/images/gsm.jpg)
 
-##Basic GSM Information
+## Basic GSM Information
 
 * Baud Rate 9600, has been known to work with other rates too
 * Requires 5V Power
@@ -13,7 +13,7 @@ This library works for this GSM, it may or may not also work with other modules:
 * <~ 350mA Power (When using functions in this library)
 * There are other features in the GSM library which have not been explained here, see files.
 
-##Connecting to GSM A6:
+### Connecting to GSM A6:
 The GSM Module is wired as followed:
 
 * RX of GSM to TX of Arduino
@@ -24,12 +24,12 @@ The GSM Module is wired as followed:
 * GND of GSM to both Arduino GND & 5V power supply GND
 * PWK of GSM to VCC5.0 of GSM
 
-###Testing Connection
+#### Testing Connection
 
 * After powering up the GSM, trigger the transistor to reset the GSM for 1-2 seconds. This step is necessary to prevent problems later.
 * Using the GSM Library call the function ‘init()’, if this returns true communication with the device is possible, if it has returned false the device can’t be communicated.
 
-##Making a GET Request (HTTP Request)
+## Making a GET Request (HTTP Request)
 
 There are two ways in the GSM library to make a HTTP Request, the first can duplicate certain variables which may cause memory issues so if your resource URL or server name is quite large you may want to use the second approach to save RAM.
 These approaches do not guarantee the integrity of the data received by the server as it may have got corrupted along the way. The data may also be intercepted/altered by a malicious user along the way.
@@ -42,7 +42,7 @@ Approach 2: (more efficient)
 
 * Use the methods ‘startTCPConnection()’ along with the server name to establish a TCP Connection that can be then used to transmit the HTTP Header manually via ‘Serial.print’ as can be seen in the ‘getRequest()’ method. After the HTTP Header has been sent the TCPConnection will need to be closed via ‘closeTCPConnection()’ before the TCP Connection times out, thus it is important not to use long delays before calling ‘closeTCPConnection()’.
 
-##Sending a SMS
+## Sending a SMS
 
 This can also be done in two different ways, the first approach as before may duplicate data causing memory problems when there is not enough memory left.
 This method of sending data is also more secure than the last, however, less data can be transmitted this way.
