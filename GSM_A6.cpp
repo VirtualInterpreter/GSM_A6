@@ -1,19 +1,18 @@
 #include "GSM_A6.h"
-#include <SoftwareSerial.h>
 
 /*
-  •	Baud Rate 9600
-  •	Requires 5V Power
-  •	Only 3.3V logic for RX & TX, doesn’t support 5V!!
-  •	If in ‘IP GPRSACT’ then running configuration commands 
-      again will prevent the module from re-entering ‘IP GPRSACT’ state. 
+  ï¿½	Baud Rate 9600
+  ï¿½	Requires 5V Power
+  ï¿½	Only 3.3V logic for RX & TX, doesnï¿½t support 5V!!
+  ï¿½	If in ï¿½IP GPRSACTï¿½ then running configuration commands
+      again will prevent the module from re-entering ï¿½IP GPRSACTï¿½ state.
       (Use Reset Pin solves this)
-  •	Advisable to reset after powering on
-  •	If connecting current directly to VCC5 via an external device, 
+  ï¿½	Advisable to reset after powering on
+  ï¿½	If connecting current directly to VCC5 via an external device,
       attach the second ground pin to the Arduino
-  •	Some commands take a certain amount of time to complete, 
+  ï¿½	Some commands take a certain amount of time to complete,
       receiving OK does not necessarily mean that the command has been completed.
-  •	<~ 300mA Power (When using functions in this library)
+  ï¿½	<~ 300mA Power (When using functions in this library)
 */
 GSM_A6::GSM_A6() : currentMessage(255) { }
 
@@ -40,17 +39,29 @@ bool GSM_A6::init() {
     }
   #endif
 
+  for (uint8_t i = 0; i < 20; ++i) {
+    Serial.print(F("AT"));
+    Serial.print(GSM_END);
+    Serial.flush();
+    delay(40);
+  }
+
   bool hasResponse = false;
   uint8_t counter = 0; // Time out counter
 
-  while (!hasResponse && counter < 35) {
-    delay(10);
+  while (!hasResponse && counter < 10) {
+    delay(50);
     sendAT();
     hasResponse = waitFor("OK", 150) == 2;
+    if (hasResponse) {
+      delay(50);
+      sendAT();
+      hasResponse = waitFor("OK", 150) == 2;
+    }
     ++counter;
   }
-  
-  if (counter >= 35) return false;
+
+  if (counter >= 10) return false;
 
   #if defined( DEBUG_GSM )
     if (myFile) {
@@ -62,7 +73,7 @@ bool GSM_A6::init() {
   sendAndWait("&F0"); // Reset Settings
   sendAndWait("E0"); // disable Echo
   sendAndWait("+CMEE=2"); // enable better error messages
-  
+
   return true;
 }
 
@@ -90,11 +101,11 @@ bool GSM_A6::setMobileNetwork(uint8_t networkProvider) {
 */
 bool GSM_A6::connectToAPN(const String & apn, const String & username, const String & password) {
   #if defined( DEBUG_GSM )
-    // Get network status for debugging  
+    // Get network status for debugging
     if (myFile) {
       myFile.println(F("Getting Network Status:"));
     }
-    sendAndWait("+CIPSTATUS");
+    sendAndWait("+CIPSTATUS", "IP INITIAL", 2);
 
     //Attach Network - Page 133 & 136
     if (!sendAndWait("+CGATT=1", 4)) {
@@ -113,7 +124,7 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       return false;
     }
     delay(1000);
-    
+
     //Set APN Details - Page 159
     if (!sendAndWait("+CSTT=\"" + apn + "\",\"" + username + "\",\"" + password + "\"")) {
       if (myFile) {
@@ -122,7 +133,7 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       return false;
     }
     delay(1000);
-    
+
     //Activate PDP Context - Page 136
     if (!sendAndWait("+CGACT=1,1")) {
       if (myFile) {
@@ -131,13 +142,13 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       return false;
     }
     delay(1000);
-    
+
     // Get network status for debugging
     if (myFile) {
       myFile.println(F("Getting Network Status:"));
     }
-    sendAndWait("+CIPSTATUS");
-    
+    sendAndWait("+CIPSTATUS", "IP GPRSACT", 2);
+
     //Get IP Address - Page 161
     if (!sendAndWait("+CIFSR", 4)) {
       if (myFile) {
@@ -199,7 +210,7 @@ uint8_t GSM_A6::getSignalStrengthRAW() {
       String temp = Serial.readString();
 
       #if defined( DEBUG_GSM )
-        captureResponse(temp);
+        captureResponse(temp, start);
       #endif
 
       if (temp.indexOf("OK") > 0) {
@@ -228,7 +239,7 @@ Quality_Rating GSM_A6::getSignalBitErrorRate() {
       String temp = Serial.readString();
 
       #if defined( DEBUG_GSM )
-        captureResponse(temp);
+        captureResponse(temp, start);
       #endif
 
       if (temp.indexOf("OK") > 0) {
@@ -251,9 +262,9 @@ Quality_Rating GSM_A6::getSignalBitErrorRate() {
 /**
    Initailises a TCP Connection with the server.
    This needs to be called before a HTTP Header can be sent.
-   
+
    @param server The domain name or IP Address of the server
-   
+
    @return true if a TCP Connection could be established or false if it can't.
  */
 bool GSM_A6::startTCPConnection(const String & server) {
@@ -272,16 +283,16 @@ bool GSM_A6::startTCPConnection(const String & server) {
     return false;
   }
   delay(150);
-  
+
   if (!sendAndWait("+CIPSEND", ">")) {
     return false;
   }
-  
+
   return true;
 }
 
 /**
-   Closes the TCP Connection made to the server and 
+   Closes the TCP Connection made to the server and
    awaits the servers response. Should be called straight after
    HTTP Header has been sent. An Example of a HTTP Header can be seen
    in the getRequest Method.
@@ -332,7 +343,7 @@ bool GSM_A6::closeTCPConnection() {
    Example:
      Server = "api.pushingbox.com"
      Resource = "/pushingbox?devid=??????????"
-   
+
    Less Memory efficient way to making a get request compared to
    startTCPConnection and closeTCPConnection.
 
@@ -342,7 +353,7 @@ bool GSM_A6::closeTCPConnection() {
    @param resource The URL location of the resource you want to reach.
 */
 bool GSM_A6::getRequest(const String & server, const String & resource) {
-  
+
   #if defined( DEBUG_GSM )
     if (myFile) {
       myFile.println(F("Making Get Request..."));
@@ -358,11 +369,11 @@ bool GSM_A6::getRequest(const String & server, const String & resource) {
     return false;
   }
   delay(150);
-  
+
   if (!sendAndWait("+CIPSEND", ">")) {
     return false;
   }
-  
+
   Serial.print(F("GET "));
   Serial.print(resource);
   Serial.print(F(" HTTP/1.1\r\n"));
@@ -407,7 +418,7 @@ bool GSM_A6::getRequest(const String & server, const String & resource) {
 
 #if defined( DEBUG_GSM )
 
-void GSM_A6::captureResponse(String &temp) {
+void GSM_A6::captureResponse(String &temp, long & start) {
   if (temp.length() > 1) {
     long currentTime = millis();
     if (myFile) {
@@ -453,7 +464,7 @@ void GSM_A6::stopDebugging() {
 
    @return true if the GSM successfully connected to the network else false.
 */
-bool GSM_A6::waitForNetwork(unsigned long timeout = 60000L) {
+bool GSM_A6::waitForNetwork(unsigned long timeout = 20000L) {
   #if defined( DEBUG_GSM )
     if (myFile) {
       myFile.println(F("Connecting To Network..."));
@@ -475,22 +486,22 @@ bool GSM_A6::waitForNetwork(unsigned long timeout = 60000L) {
 /*
    Waits for a response from the GSM. The lower the return number
    the more fatal of the error.
-   
+
    @param expected Part of the desired response from the GSM Module
    @param timeout The time in milliseconds to timeout after.
 
-   @return 0 for a fatal error, 1 for a minor error (try resending command), 
+   @return 0 for a fatal error, 1 for a minor error (try resending command),
               2 desired response was recieved from the GSM.
 */
-uint8_t GSM_A6::waitFor(String expected = "OK", unsigned long timeout = 40000L) {
+uint8_t GSM_A6::waitFor(String expected = "OK", unsigned long timeout = 20000L) {
   long start = millis();
   while (millis() - start < timeout) {
     String temp = Serial.readString();
-    
+
     #if defined( DEBUG_GSM )
-      captureResponse(temp);
+      captureResponse(temp, start);
     #endif
-    Serial.println(temp);
+
     if (temp.indexOf(expected) > 0) {
       return 2;
     } else if (temp.indexOf("ERROR")) {
@@ -513,7 +524,7 @@ uint8_t GSM_A6::waitFor(String expected = "OK", unsigned long timeout = 40000L) 
    Example: command = "+CREG"
    sent to GSM = "AT+CREG"
 
-   @param command The command to send to the GSM. 
+   @param command The command to send to the GSM.
 */
 void GSM_A6::sendCommand(const String & command) {
   #if defined( DEBUG_GSM )
@@ -617,7 +628,7 @@ bool GSM_A6::setSMSStorage() {
 
 bool GSM_A6::hasNextMessage(bool rollover = false) {
   if (!setSMSStorage()) return false;
-  
+
   for (uint8_t i = 0; i < 2; ++i) {
     sendCommand("+CMGL=\"ALL\"");
 
@@ -626,7 +637,7 @@ bool GSM_A6::hasNextMessage(bool rollover = false) {
       String temp = Serial.readString();
 
       #if defined( DEBUG_GSM )
-        captureResponse(temp);
+        captureResponse(temp, start);
       #endif
 
       if (temp.indexOf("OK") > 0) {
@@ -652,7 +663,7 @@ bool GSM_A6::hasNextMessage(bool rollover = false) {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -677,11 +688,11 @@ SMS_Message GSM_A6::getSMS(uint8_t message) {
       String temp = Serial.readString();
 
       #if defined( DEBUG_GSM )
-        captureResponse(temp);
+        captureResponse(temp, start);
       #endif
 
       if (temp.indexOf("OK") > 0) {
-        
+
       } else if (temp.indexOf("ERROR")) {
         if (temp.indexOf("Excute command failure") > 0) {
           break;
