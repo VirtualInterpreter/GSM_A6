@@ -6,8 +6,11 @@
 #else
 	#include "WProgram.h"
 #endif
-#include <SdFat.h>
-#include <SPI.h>
+//#define DEBUG_GSM
+#if defined(DEBUG_GSM)
+	#include <SdFat.h>
+	#include <SPI.h>
+#endif
 
 #define GSM_END "\r\n"
 #define GSM_OK "OK" + GSM_END
@@ -48,7 +51,6 @@ enum Quality_Rating : uint8_t {
   NOT_KNOWN = 99,
 };
 
-#define DEBUG_GSM
 
 class GSM_A6 {
 public:
