@@ -17,7 +17,7 @@
 GSM_A6::GSM_A6() : currentMessage(255) { }
 
 /*
-   Initailises the GSM Module and gets into sync with the GSM.
+   Initialises the GSM Module and gets into sync with the GSM.
    If the GSM fails to communicate with the Arduino this method
    returns false.
 
@@ -73,10 +73,19 @@ bool GSM_A6::init() {
   sendAndWait("&F0"); // Reset Settings
   sendAndWait("E0"); // disable Echo
   sendAndWait("+CMEE=2"); // enable better error messages
+  sendAndWait("+CPMS=\"SM\",\"SM\",\"SM\""); // Set SMS Storage for 3 memory areas
+  sendAndWait("+CMGF=1");
 
   return true;
 }
 
+/*
+  Sets the Network Provider
+
+  @param networkProvider 0 == GIFFGAFF, 1 == THREE, 2 == ASDA
+
+  @return true if the network provider was successfully set
+*/
 bool GSM_A6::setMobileNetwork(uint8_t networkProvider) {
   if (networkProvider == N_GIFFGAFF) {
     return connectToAPN(F("giffgaff.com"), F("giffgaff"), "");
@@ -180,6 +189,11 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
   #endif
 }
 
+/*
+  Gets the Quality of the Signal Strength
+
+  @return Quality_Rating of signal strength
+*/
 Quality_Rating GSM_A6::getSignalStrength() {
   uint8_t signalStrengthRAW = getSignalStrengthRAW();
   if (signalStrengthRAW <= 10) {
@@ -201,6 +215,11 @@ Quality_Rating GSM_A6::getSignalStrength() {
   }
 }
 
+/*
+  Returns the raw value of the signal strength
+
+  @return signal strength
+*/
 uint8_t GSM_A6::getSignalStrengthRAW() {
   for (uint8_t i = 0; i < 2; ++i) {
     sendCommand("+CSQ");
@@ -230,6 +249,11 @@ uint8_t GSM_A6::getSignalStrengthRAW() {
   }
 }
 
+/*
+  Gets the wireless communication error rate
+
+  @return Quality_Rating of the Error rate
+*/
 Quality_Rating GSM_A6::getSignalBitErrorRate() {
   for (uint8_t i = 0; i < 2; ++i) {
     sendCommand("+CSQ");
@@ -260,7 +284,7 @@ Quality_Rating GSM_A6::getSignalBitErrorRate() {
 }
 
 /**
-   Initailises a TCP Connection with the server.
+   Initialises a TCP Connection with the server.
    This needs to be called before a HTTP Header can be sent.
 
    @param server The domain name or IP Address of the server
@@ -414,6 +438,8 @@ bool GSM_A6::getRequest(const String & server, const String & resource) {
   #else
     if (!sendAndWait("+CIPCLOSE")) return false;
   #endif
+
+  return true;
 }
 
 #if defined( DEBUG_GSM )
@@ -592,25 +618,42 @@ bool GSM_A6::sendAndWait(const String & command, const String expected, uint8_t 
   return false;
 }
 
+/*
+  Used to start a SMS Message, should be followed by a phone number
+
+  @return true if the SMS Message could be successfully started
+*/
 bool GSM_A6::startSMS() {
   if (!sendAndWait("+CMGF=1")) return false;
   delay(2000);
-  if (!sendAndWait("+CMGS=\"")) return false;
+  Serial.print("AT+CMGS=\"");
   return true;
 }
 
-bool GSM_A6::enterSMSContent() {
+/*
+  Marks the end of the phone number and the beginning of the SMS Body
+*/
+void GSM_A6::enterSMSContent() {
   Serial.write(0x22);
   Serial.print(GSM_END);
   delay(2000);
 }
 
-bool GSM_A6::sendSMS() {
+/*
+  Finishes and sends the SMS Message
+*/
+void GSM_A6::sendSMS() {
   delay(500);
   Serial.println(char(26));
 }
 
-bool GSM_A6::quickSMS(const String & phoneNo, const String & message) {
+/*
+  Sends a SMS Message
+
+  @param phoneNo The phone number to text
+  @param message The message to send
+*/
+void GSM_A6::quickSMS(const String & phoneNo, const String & message) {
   startSMS();
   Serial.print(phoneNo);
   enterSMSContent();
@@ -618,22 +661,24 @@ bool GSM_A6::quickSMS(const String & phoneNo, const String & message) {
   sendSMS();
 }
 
-bool GSM_A6::setSMSStorage() {
-  if (!isSmsStorageSet) {
-    // AT + CPMS = "SM" - Set Storage
-    isSmsStorageSet = true;
-    return sendAndWait("+CPMS=\"SM\"");
-  }
+/*
+  Not fully implemented due to firmware problems
+*/
+void GSM_A6::startMessageCheck() {
+  currentMessage = 0;
 }
 
-bool GSM_A6::hasNextMessage(bool rollover = false) {
-  if (!setSMSStorage()) return false;
+/*
+  Not fully implemented due to firmware problems
+*/
+bool GSM_A6::hasNextMessage() {
 
   for (uint8_t i = 0; i < 2; ++i) {
     sendCommand("+CMGL=\"ALL\"");
 
     long start = millis();
-    while (millis() - start < 9000) {
+    while (millis() - start < 7000) {
+      delay(2000);
       String temp = Serial.readString();
 
       #if defined( DEBUG_GSM )
@@ -645,12 +690,7 @@ bool GSM_A6::hasNextMessage(bool rollover = false) {
           return temp.length() > 10; // Must be SMS
         } else {
           // Last SMS has highest index
-          uint8_t indexof = temp.charAt(temp.lastIndexOf("+CMGL: "));
-          String number = String(indexof + 1);
-          if (temp.charAt(indexof + 2) != ',') {
-            number = number + temp.charAt(temp.lastIndexOf("+CMGL: ") + 2);
-          }
-          return currentMessage < number.toInt();
+          return currentMessage < getMessageID(temp);
         }
       } else if (temp.indexOf("ERROR")) {
         if (temp.indexOf("Excute command failure") > 0) {
@@ -671,25 +711,18 @@ bool GSM_A6::hasNextMessage(bool rollover = false) {
    Not fully implemented yet, does not work!!
 */
 SMS_Message GSM_A6::getNextMessage(bool containDate = true, bool containSender = true, bool containContent = true) {
-  if (!setSMSStorage()) return {};
 
-}
-/*
-  Not fully implemented yet, does not work!!
-*/
-SMS_Message GSM_A6::getSMS(uint8_t message) {
-  if (!setSMSStorage()) return {};
   for (uint8_t i = 0; i < 2; ++i) {
-    //AT + CMGR = [messageID]
-    sendCommand("+CMGR=" + String(message));
+    sendCommand("+CMGL=\"ALL\"");
 
     long start = millis();
-    while (millis() - start < 9000) {
+    while (millis() - start < 7000) {
+      delay(3000);
       String temp = Serial.readString();
-
-      #if defined( DEBUG_GSM )
-        captureResponse(temp, start);
-      #endif
+      Serial.println(temp);
+    #if defined( DEBUG_GSM )
+      captureResponse(temp, start);
+    #endif
 
       if (temp.indexOf("OK") > 0) {
 
@@ -704,17 +737,99 @@ SMS_Message GSM_A6::getSMS(uint8_t message) {
       }
     }
   }
+
   return {};
 }
 
+/*
+  Not fully implemented due to firmware problems
+*/
+uint8_t GSM_A6::getMessageID(const String & message) {
+  uint8_t indexBeforeNo = message.lastIndexOf("+CMGL: ") + 6;
+  String number = String(message.charAt(indexBeforeNo + 1));
+  if ((indexBeforeNo + 2) < message.length() && message.charAt(indexBeforeNo + 2) != ',') {
+    number = number + message.charAt(indexBeforeNo + 2);
+    if ((indexBeforeNo + 3) < message.length() && message.charAt(indexBeforeNo + 3) != ',') {
+      number = number + message.charAt(indexBeforeNo + 3);
+    }
+  }
+  return number.toInt();
+}
+
+/*
+  Not fully implemented yet, does not work!!
+*/
+SMS_Message GSM_A6::getSMS(uint8_t messageID) {
+
+  for (uint8_t i = 0; i < 2; ++i) {
+    //AT + CMGR = [messageID]
+    sendCommand("+CMGR=" + String(messageID));
+
+    long start = millis();
+    while (millis() - start < 7000) {
+      delay(2000);
+      String data = Serial.readStringUntil(',');
+
+      if (data.indexOf("+CMGL: ") > -1) {
+        SMS_Message newMessage;
+        uint8_t indexBeforeNo = data.lastIndexOf("+CMGL: ") + 6;
+        newMessage.id = getMessageID(data);
+
+        Serial.read();
+        data = Serial.readStringUntil(',');
+        newMessage.status = data.indexOf("UNREAD") > -1 ? 1 : 0;
+
+        Serial.read();
+        data = Serial.readStringUntil(',');
+        newMessage.sender = data.substring(1, 12);
+
+        Serial.read();
+        Serial.readStringUntil(',');
+        Serial.read();
+
+        data = Serial.readStringUntil(',');
+        newMessage.timeRecieved = data.substring(1, data.length());
+        Serial.read();
+        data = Serial.readStringUntil('"');
+        newMessage.timeRecieved = newMessage.timeRecieved + "," + data;
+
+        Serial.read();
+        newMessage.content = Serial.readStringUntil("OK");
+
+        data = Serial.readString();
+
+        if (data.indexOf("OK") > -1) {
+          return newMessage;
+        }
+
+      }
+
+      //#if defined( DEBUG_GSM )
+        //captureResponse(temp, start);
+      //#endif
+
+    }
+  }
+  return {};
+}
+
+/*
+  Not fully implemented due to firmware problems
+*/
 bool GSM_A6::deleteSMS(uint8_t message) {
   return sendAndWait("+CMGD=" + String(message) + ",0");
 }
 
+/*
+  Not fully implemented due to firmware problems
+*/
 bool GSM_A6::deleteAllSMS() {
   return sendAndWait("+CMGD=1,4");
 }
 
+/*
+  Not fully implemented due to firmware problems
+*/
 bool GSM_A6::deleteAllReadSMS() {
   return sendAndWait("+CMGD=1,1");
 }

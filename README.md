@@ -1,6 +1,7 @@
 # GSM-A6 Readme
 This library works for this GSM, it may or may not also work with other modules:
 ![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm.jpg)
+This library is not able to receive SMS messages due to firmware problems, however, it can send SMS messages and connect to the internet.
 
 ## Basic GSM Information
 
@@ -20,6 +21,8 @@ The GSM Module is wired as followed:
 (The RX and TX pins of the GSM could also be connected to two other digital pins if the SoftwareSerial Library is used, however, the GSM library would have to be modified to use the software serial instead of the normal Serial.)
 * TX of GSM to RX of Arduino
 * RST to Collector of Transistor
+* Base of Transistor to pin 5 of Arduino (Can be changed as needed)
+* Emitter of Transistor to GND of GSM
 * VCC5.0 to 5V Power Supply
 * GND of GSM to both Arduino GND & 5V power supply GND
 * PWK of GSM to VCC5.0 of GSM

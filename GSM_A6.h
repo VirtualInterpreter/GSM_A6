@@ -6,7 +6,9 @@
 #else
 	#include "WProgram.h"
 #endif
+
 //#define DEBUG_GSM
+
 #if defined(DEBUG_GSM)
 	#include <SdFat.h>
 	#include <SPI.h>
@@ -75,18 +77,24 @@ public:
   void sendCommand(const String & command);
   void sendAT();
 
-  bool quickSMS(const String & phoneNo, const String & message);
+  void quickSMS(const String & phoneNo, const String & message);
   bool startSMS();
-  bool enterSMSContent();
-  bool sendSMS();
+  void enterSMSContent();
+  void sendSMS();
 
-  bool setSMSStorage();
-  bool hasNextMessage(bool rollover = false);
+  void startMessageCheck();
+	// Does not work due to firmware problems
+  bool hasNextMessage();
+	// Does not work due to firmware problems
   SMS_Message getNextMessage(bool containDate = true, bool containSender = true, bool containContent = true);
-  SMS_Message getSMS(uint8_t message);
+	// Does not work due to firmware problems
+  SMS_Message getSMS(uint8_t messageID);
 
+	// Does not work due to firmware problems
   bool deleteSMS(uint8_t messageIndex);
+	// Does not work due to firmware problems
   bool deleteAllSMS();
+	// Does not work due to firmware problems
   bool deleteAllReadSMS();
 
   #if defined( DEBUG_GSM )
@@ -99,6 +107,8 @@ private:
   //SoftwareSerial& serialA6;
   uint8_t currentMessage;
   bool isSmsStorageSet;
+
+  uint8_t getMessageID(const String & message);
 
   #if defined( DEBUG_GSM )
     bool isDebugging;
