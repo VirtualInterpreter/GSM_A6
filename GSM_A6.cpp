@@ -3,7 +3,7 @@
 /*
   �	Baud Rate 9600
   �	Requires 5V Power
-  �	Only 3.3V logic for RX & TX, doesn�t support 5V!!
+  �	Only 3.3V logic for RX & TX, doesn't support 5V!!
   �	If in �IP GPRSACT� then running configuration commands
       again will prevent the module from re-entering �IP GPRSACT� state.
       (Use Reset Pin solves this)
@@ -144,7 +144,7 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
     delay(1000);
 
     //Activate PDP Context - Page 136
-    if (!sendAndWait("+CGACT=1,1")) {
+    if (!sendAndWait(F("+CGACT=1,1"))) {
       if (myFile) {
         myFile.println(F("Failed - Activate PDP Context"));
       }
@@ -156,7 +156,16 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
     if (myFile) {
       myFile.println(F("Getting Network Status:"));
     }
-    sendAndWait("+CIPSTATUS", "IP GPRSACT", 2);
+
+    // The new version of the GSM A6 returns IP START here
+    // And it requires and additional command to ready the internet connection
+    if (sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) {
+      if (myFile) {
+        myFile.println(F("Newer Version of GSM Detected"));
+      }
+      if (!sendAndWait(F("+CIICR"), 4)) return false;
+      delay(2000);
+    }
 
     //Get IP Address - Page 161
     if (!sendAndWait("+CIFSR", 4)) {
@@ -166,9 +175,12 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       return false;
     }
 
+    if (!sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) return false;
+
     if (myFile) {
       myFile.println(F("Success - APN Connection"));
     }
+
     return true;
   #else
     //Attach Network - Page 133 & 136
@@ -183,8 +195,17 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
     //Activate PDP Context - Page 136
     if (!sendAndWait(F("+CGACT=1,1"))) return false;
     delay(1500);
+
+    // The new version of the GSM A6 returns IP START here
+    // And it requires and additional command to ready the internet connection
+    if (sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) {
+      if (!sendAndWait(F("+CIICR"), 4)) return false;
+      delay(2000);
+    }
+
     //Get IP Address - Page 161
     if (!sendAndWait(F("+CIFSR"), 4)) return false;
+
     return true;
   #endif
 }
