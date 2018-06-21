@@ -7,7 +7,7 @@
 	#include "WProgram.h"
 #endif
 
-//#define DEBUG_GSM
+#define DEBUG_GSM
 
 #if defined(DEBUG_GSM)
 	#include <SdFat.h>
@@ -37,7 +37,7 @@ enum Message_Status : uint8_t {
 struct SMS_Message {
   uint8_t id;
   Message_Status status;
-  String timeRecieved;
+  String timeReceived;
   String sender;
   String content;
 };
@@ -59,6 +59,8 @@ public:
   GSM_A6();
 
   bool init();
+  bool attemptSync(const String & username);
+  bool attemptAutoTune();
   bool setMobileNetwork(uint8_t networkProvider);
   bool connectToAPN(const String & apn, const String & username, const String & password);
 
@@ -82,20 +84,26 @@ public:
   void enterSMSContent();
   void sendSMS();
 
-  void startMessageCheck();
-	// Does not work due to firmware problems
-  bool hasNextMessage();
-	// Does not work due to firmware problems
-  SMS_Message getNextMessage(bool containDate = true, bool containSender = true, bool containContent = true);
-	// Does not work due to firmware problems
-  SMS_Message getSMS(uint8_t messageID);
+  // Returns the total number of accessible messages
+  // Standard GSM A6 Module can only store 20 messages at most
+  uint8_t totalMessages();
 
-	// Does not work due to firmware problems
-  bool deleteSMS(uint8_t messageIndex);
-	// Does not work due to firmware problems
+  // Start retrieving SMS messages from the beginning of the SMS Message List
+  // Stored on the SIM Card
+  void startMessageCheck();
+	bool hasNextMessage();
+  SMS_Message getNextMessage();
+	SMS_Message getSMS(uint8_t messageID);
+  
   bool deleteAllSMS();
-	// Does not work due to firmware problems
-  bool deleteAllReadSMS();
+
+  /* 
+     Unstable not recommended to be used, would
+     require reset of GSM straight away after using.
+     Else messages may become lost during current session.
+  */
+  //bool deleteSMS(uint8_t messageIndex);
+  //bool deleteAllReadSMS();
 
   #if defined( DEBUG_GSM )
     void captureResponse(String &temp, long & start);

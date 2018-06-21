@@ -39,29 +39,15 @@ bool GSM_A6::init() {
     }
   #endif
 
-  for (uint8_t i = 0; i < 20; ++i) {
-    Serial.print(F("AT"));
-    Serial.print(GSM_END);
-    Serial.flush();
-    delay(40);
+  if (!attemptSync("AT")) {
+    #if defined( DEBUG_GSM )
+      if (!attemptSync("AT")) {
+        if (!attemptAutoTune()) return false;
+      }
+    #else
+      return false;
+    #endif
   }
-
-  bool hasResponse = false;
-  uint8_t counter = 0; // Time out counter
-
-  while (!hasResponse && counter < 10) {
-    delay(50);
-    sendAT();
-    hasResponse = waitFor("OK", 150) == 2;
-    if (hasResponse) {
-      delay(50);
-      sendAT();
-      hasResponse = waitFor("OK", 150) == 2;
-    }
-    ++counter;
-  }
-
-  if (counter >= 10) return false;
 
   #if defined( DEBUG_GSM )
     if (myFile) {
@@ -78,6 +64,78 @@ bool GSM_A6::init() {
 
   return true;
 }
+
+/*
+   Tries to initailise communication with the GSM, using it's auto syncing ability.
+   It sends the given command multiple times.
+   @return true if the GSM could clearly respond to the command
+*/
+bool GSM_A6::attemptSync(const String & command) {
+  for (uint8_t i = 0; i < 20; ++i) {
+    Serial.print(command);
+    Serial.print(GSM_END);
+    Serial.flush();
+    delay(40);
+  }
+
+  bool hasResponse = false;
+  uint8_t counter = 0; // Time out counter
+
+  while (!hasResponse && counter < 10) {
+    delay(50);
+    Serial.print(command);
+    Serial.print(GSM_END);
+    Serial.flush();
+    hasResponse = waitFor("OK", 150) == 2;
+    if (hasResponse) {
+      delay(50);
+      Serial.print(command);
+      Serial.print(GSM_END);
+      Serial.flush();
+      hasResponse = waitFor("OK", 150) == 2;
+    }
+    ++counter;
+  }
+
+  return (counter < 10);
+}
+
+#if defined( DEBUG_GSM )
+/*
+  Loops through all the baud rates to see if it can find the current
+  one the GSM is operating at.
+
+  @return true if a line of communication has been setup with the GSM
+*/
+bool GSM_A6::attemptAutoTune() {
+
+  uint8_t iterations = 0;
+  uint8_t currentBaudRate = 0;
+  long int baudRate[10] = { 300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 74880, 115200};
+
+  while ((!attemptSync("AT")) && iterations < 2) {
+    ++currentBaudRate;
+    if (currentBaudRate == 10) {
+      currentBaudRate = 0;
+      ++iterations;
+    }
+    Serial.flush();
+    Serial.begin(baudRate[currentBaudRate]);
+  }
+
+  if (!(iterations == 2)) {
+    myFile.println("Baud Rate Found at: ");
+    myFile.println(baudRate[currentBaudRate]);
+  } else {
+    Serial.begin(9600);
+    Serial.println(F("Baud Rate not Found"));
+    Serial.println(F("Baud Rate not Found"));
+  }
+
+  return !(iterations == 2);
+}
+
+#endif
 
 /*
   Sets the Network Provider
@@ -144,9 +202,11 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
     delay(1000);
 
     //Activate PDP Context - Page 136
-    if (!sendAndWait(F("+CGACT=1,1"))) {
+    if (!sendAndWait(F("+CGACT=1,1"), 4)) {
       if (myFile) {
         myFile.println(F("Failed - Activate PDP Context"));
+        myFile.print(F("GSM couldn't be attached to the mobile network "));
+        myFile.println(F("(check APN settings and SIM Card is activated)"));
       }
       return false;
     }
@@ -157,14 +217,17 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       myFile.println(F("Getting Network Status:"));
     }
 
-    // The new version of the GSM A6 returns IP START here
-    // And it requires and additional command to ready the internet connection
-    if (sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) {
-      if (myFile) {
-        myFile.println(F("Newer Version of GSM Detected"));
+    // Check for old version first
+    if (!sendAndWait(F("+CIPSTATUS"), "IP GPRSACT", 2)) {
+      // The new version of the GSM A6 returns IP START here
+      // And it requires and additional command to ready the internet connection
+      if (sendAndWait(F("+CIPSTATUS"), "IP START" , 2)) {
+        if (myFile) {
+          myFile.println(F("Newer Version of GSM Detected, Firmware needs flash back"));
+        }
+        if (!sendAndWait(F("+CIICR"), 4)) return false;
+        delay(2000);
       }
-      if (!sendAndWait(F("+CIICR"), 4)) return false;
-      delay(2000);
     }
 
     //Get IP Address - Page 161
@@ -175,7 +238,7 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       return false;
     }
 
-    if (!sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) return false;
+    if (!sendAndWait(F("+CIPSTATUS"), "OK" , 4)) return false;
 
     if (myFile) {
       myFile.println(F("Success - APN Connection"));
@@ -193,16 +256,18 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
     if (!sendAndWait("+CSTT=\"" + apn + "\",\"" + username + "\",\"" + password + "\"")) return false;
     delay(1500);
     //Activate PDP Context - Page 136
-    if (!sendAndWait(F("+CGACT=1,1"))) return false;
+    if (!sendAndWait(F("+CGACT=1,1"), 4)) return false;
     delay(1500);
 
-    // The new version of the GSM A6 returns IP START here
-    // And it requires and additional command to ready the internet connection
-    if (sendAndWait(F("+CIPSTATUS"), "IP START" , 4)) {
-      if (!sendAndWait(F("+CIICR"), 4)) return false;
-      delay(2000);
+    // Check for older version first, as the GSM will then be quicker in the field
+    if (!sendAndWait(F("+CIPSTATUS"), "IP GPRSACT", 2)) {
+      // The new version of the GSM A6 returns IP START here
+      // And it requires and additional command to ready the internet connection
+      if (sendAndWait(F("+CIPSTATUS"), "IP START" , 2)) {
+        if (!sendAndWait(F("+CIICR"), 4)) return false;
+          delay(2000);
+      }
     }
-
     //Get IP Address - Page 161
     if (!sendAndWait(F("+CIFSR"), 4)) return false;
 
@@ -532,7 +597,8 @@ bool GSM_A6::waitForNetwork(unsigned long timeout = 20000L) {
 
 /*
    Waits for a response from the GSM. The lower the return number
-   the more fatal of the error.
+   the more fatal of the error. The result is recorded to an SD Card if
+   Debugging is Enabled, in the header file.
 
    @param expected Part of the desired response from the GSM Module
    @param timeout The time in milliseconds to timeout after.
@@ -683,174 +749,227 @@ void GSM_A6::quickSMS(const String & phoneNo, const String & message) {
 }
 
 /*
-  Not fully implemented due to firmware problems
+  Gets the total number of messages held on the SIM card.
+  This only retrieves messages held on the SIM Card itself,
+  as the GSM A6 has no other means of storage.
+
+  Messages maybe recieved straight after calling this method,
+  so it is useful to use 'hasNextMessage()' when iterating 
+  through the list of messages.
+
+  @return number of messages, 0 if none are present.
+*/
+uint8_t GSM_A6::totalMessages() {
+
+  for (uint8_t i = 0; i < 2; ++i) {
+
+    sendCommand("+CPMS?");
+
+    #if defined( DEBUG_GSM )
+      if (myFile) {
+        myFile.println(F("Response:"));
+      }
+      uint8_t counter = 0;
+    #endif
+
+    long start = millis();
+    while (millis() - start < 20000L) {
+      String data = Serial.readStringUntil(',');
+
+      #if defined( DEBUG_GSM )
+        if (myFile) {
+          ++counter;
+          if (data.length() > 1) {
+            myFile.print("Counter is: ");
+            myFile.println(counter);
+            myFile.print(data);
+            myFile.print(F(","));
+          }
+        }
+      #endif
+
+      if (data.indexOf("+CPMS: ") > -1) {
+        String data = Serial.readStringUntil(',');
+        uint8_t noOfMessages = data.charAt(data.length() - 1) -'0'; // Last character
+
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            myFile.print(data);
+            myFile.print(F(","));
+            data = Serial.readString();
+            myFile.println(data);
+            long currentTime = millis();
+            myFile.print(F("Time Taken (ms): "));
+            myFile.println(currentTime - start);
+          }
+        #else
+          Serial.readString();
+        #endif
+
+        return noOfMessages;
+      }
+    }
+  }
+  return 0;
+}
+
+/*
+  Start retrieving SMS messages from the beginning of the SMS Message List
+  stored on the SIM Card
 */
 void GSM_A6::startMessageCheck() {
   currentMessage = 0;
 }
 
 /*
-  Not fully implemented due to firmware problems
+  Checks to see if there is another message in the list.
+  @return true if there is another message after the current message
 */
 bool GSM_A6::hasNextMessage() {
-
-  for (uint8_t i = 0; i < 2; ++i) {
-    sendCommand("+CMGL=\"ALL\"");
-
-    long start = millis();
-    while (millis() - start < 7000) {
-      delay(2000);
-      String temp = Serial.readString();
-
-      #if defined( DEBUG_GSM )
-        captureResponse(temp, start);
-      #endif
-
-      if (temp.indexOf("OK") > 0) {
-        if (currentMessage == 255) { // Is currentMessage not set
-          return temp.length() > 10; // Must be SMS
-        } else {
-          // Last SMS has highest index
-          return currentMessage < getMessageID(temp);
-        }
-      } else if (temp.indexOf("ERROR")) {
-        if (temp.indexOf("Excute command failure") > 0) {
-          break;
-        } else if (temp.indexOf("invalid command line") > 0) {
-          break;
-        } else if (temp.indexOf("FATAL ERROR") > 0) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return false;
+  return currentMessage < totalMessages();
 }
 
 /*
-   Not fully implemented yet, does not work!!
+  Gets the next SMS message from the sim card
+
+  @return SMS_Message or {} if no message is present
 */
-SMS_Message GSM_A6::getNextMessage(bool containDate = true, bool containSender = true, bool containContent = true) {
-
-  for (uint8_t i = 0; i < 2; ++i) {
-    sendCommand("+CMGL=\"ALL\"");
-
-    long start = millis();
-    while (millis() - start < 7000) {
-      delay(3000);
-      String temp = Serial.readString();
-      Serial.println(temp);
-    #if defined( DEBUG_GSM )
-      captureResponse(temp, start);
-    #endif
-
-      if (temp.indexOf("OK") > 0) {
-
-      } else if (temp.indexOf("ERROR")) {
-        if (temp.indexOf("Excute command failure") > 0) {
-          break;
-        } else if (temp.indexOf("invalid command line") > 0) {
-          break;
-        } else if (temp.indexOf("FATAL ERROR") > 0) {
-          return {};
-        }
-      }
-    }
-  }
-
-  return {};
+SMS_Message GSM_A6::getNextMessage() {
+  return getSMS(++currentMessage);
 }
 
 /*
-  Not fully implemented due to firmware problems
-*/
-uint8_t GSM_A6::getMessageID(const String & message) {
-  uint8_t indexBeforeNo = message.lastIndexOf("+CMGL: ") + 6;
-  String number = String(message.charAt(indexBeforeNo + 1));
-  if ((indexBeforeNo + 2) < message.length() && message.charAt(indexBeforeNo + 2) != ',') {
-    number = number + message.charAt(indexBeforeNo + 2);
-    if ((indexBeforeNo + 3) < message.length() && message.charAt(indexBeforeNo + 3) != ',') {
-      number = number + message.charAt(indexBeforeNo + 3);
-    }
-  }
-  return number.toInt();
-}
-
-/*
-  Not fully implemented yet, does not work!!
+  Retrieves the message with the given ID, ID's start at 0.
+  Sender phone number is formatted to remove the area code
+  so +44... is 0...
 */
 SMS_Message GSM_A6::getSMS(uint8_t messageID) {
+  SMS_Message newMessage;
 
   for (uint8_t i = 0; i < 2; ++i) {
     //AT + CMGR = [messageID]
     sendCommand("+CMGR=" + String(messageID));
 
+    #if defined( DEBUG_GSM )
+      if (myFile) {
+        myFile.println(F("Response:"));
+      }
+      uint8_t counter = 0;
+    #endif
+    
     long start = millis();
-    while (millis() - start < 7000) {
-      delay(2000);
+    while (millis() - start < 20000L) {
       String data = Serial.readStringUntil(',');
+      
+      #if defined( DEBUG_GSM )
+        if (myFile) {
+          ++counter;
+          if (data.length() > 1) {
+            myFile.print("Counter is: ");
+            myFile.println(counter);
+            myFile.print(data);
+          }
+        }
+      #endif
 
-      if (data.indexOf("+CMGL: ") > -1) {
-        SMS_Message newMessage;
-        uint8_t indexBeforeNo = data.lastIndexOf("+CMGL: ") + 6;
-        newMessage.id = getMessageID(data);
-
-        Serial.read();
-        data = Serial.readStringUntil(',');
+      if (data.indexOf("+CMGR: ") > -1) {
+        //uint8_t indexBeforeNo = data.lastIndexOf("+CMGR: ") + 6;
+        //newMessage.id = getMessageID(data);
+        newMessage.id = messageID;
         newMessage.status = data.indexOf("UNREAD") > -1 ? 1 : 0;
 
-        Serial.read();
-        data = Serial.readStringUntil(',');
-        newMessage.sender = data.substring(1, 12);
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            Serial.read();
+            myFile.print(F(","));
+            data = Serial.readStringUntil(',');
+            myFile.print(data);
+          }
+        #else
+          Serial.read();
+          data = Serial.readStringUntil(',');
+        #endif
+        
+        newMessage.sender = "0" + data.substring(4, 14);
 
-        Serial.read();
-        Serial.readStringUntil(',');
-        Serial.read();
+        // Prints ,, - and any contents present between the comma's
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            Serial.read();
+            myFile.print(F(","));
+            data = Serial.readStringUntil(',');
+            myFile.print(data);
+            Serial.read();
+            myFile.print(F(","));
+          } else {
+            Serial.read();
+            Serial.readStringUntil(',');
+            Serial.read();
+          }
+        #else
+          Serial.read();
+          Serial.readStringUntil(',');
+          Serial.read();
+        #endif
 
         data = Serial.readStringUntil(',');
-        newMessage.timeRecieved = data.substring(1, data.length());
+        newMessage.timeReceived = data.substring(1, data.length());
         Serial.read();
+        
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            myFile.print(data);
+            myFile.print(F(","));
+          }
+        #endif
+
         data = Serial.readStringUntil('"');
-        newMessage.timeRecieved = newMessage.timeRecieved + "," + data;
+        newMessage.timeReceived = newMessage.timeReceived + "," + data;
+        Serial.read(); // "
 
-        Serial.read();
-        newMessage.content = Serial.readStringUntil("OK");
-
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            myFile.print(data);
+            myFile.println(F("\""));
+          }
+        #endif
+        
         data = Serial.readString();
+        newMessage.content = data.substring(2, data.lastIndexOf("OK")-4);
 
-        if (data.indexOf("OK") > -1) {
-          return newMessage;
-        }
+        #if defined( DEBUG_GSM )
+          if (myFile) {
+            myFile.println(newMessage.content);
+            long currentTime = millis();
+            myFile.println(F("OK"));
+            myFile.print(F("Time Taken (ms): "));
+            myFile.println(currentTime - start);
+          }
+        #endif
+
+        delay(500);
+        return newMessage;
 
       }
 
-      //#if defined( DEBUG_GSM )
-        //captureResponse(temp, start);
-      //#endif
-
     }
   }
+
+  delay(500);
   return {};
 }
 
-/*
-  Not fully implemented due to firmware problems
-*/
-bool GSM_A6::deleteSMS(uint8_t message) {
-  return sendAndWait("+CMGD=" + String(message) + ",0");
-}
 
-/*
-  Not fully implemented due to firmware problems
-*/
 bool GSM_A6::deleteAllSMS() {
   return sendAndWait("+CMGD=1,4");
 }
 
 /*
-  Not fully implemented due to firmware problems
-*/
+bool GSM_A6::deleteSMS(uint8_t message) {
+return sendAndWait("+CMGD=" + String(message) + ",0");
+}
+
 bool GSM_A6::deleteAllReadSMS() {
   return sendAndWait("+CMGD=1,1");
 }
+*/

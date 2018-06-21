@@ -1,7 +1,8 @@
 # GSM-A6 Readme
 This library works for this GSM, it may or may not also work with other modules:
-![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm.jpg)
-This library is not able to receive SMS messages due to firmware problems, however, it can send SMS messages and connect to the internet.
+Pin setup has been optimised to work with the 2G FreeStation.
+![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm.jpg  =100x80)
+Ensure you have the correct firmware on your GSM, before trying to use features of it.
 
 ## Basic GSM Information
 
@@ -13,6 +14,13 @@ This library is not able to receive SMS messages due to firmware problems, howev
 * Some commands take a certain amount of time to complete, receiving OK does not necessarily mean that the command has been completed.
 * <~ 350mA Power (When using functions in this library)
 * There are other features in the GSM library which have not been explained here, see files.
+* Even when the GSM is powered off, the LED onboard may still draw power from RX & TX and light up.
+
+### Recommended Components
+
+* GSM A6
+* 3V latching relay (EC2-3TNU) [datasheet](https://www.mouser.co.uk/datasheet/2/212/KEM_R7002_EC2_EE2-1104574.pdf)
+* Transistor (KSP44BU)
 
 ### Connecting to GSM A6:
 The GSM Module is wired as followed:
@@ -21,17 +29,22 @@ The GSM Module is wired as followed:
 (The RX and TX pins of the GSM could also be connected to two other digital pins if the SoftwareSerial Library is used, however, the GSM library would have to be modified to use the software serial instead of the normal Serial.)
 * TX of GSM to RX of Arduino
 * RST to Collector of Transistor
-* Base of Transistor to pin 5 of Arduino (Can be changed as needed)
+* Base of Transistor to pin 17 (A3) of Arduino (Can be changed as needed)
 * Emitter of Transistor to GND of GSM
-* VCC5.0 to 5V Power Supply
+* Using the datasheet of the 3V relay, connect pin 15 (A1) of the arduino to pin 4 or pin 9 of the relay.
+* Likewise connect pin 4 of the arduino to pin 5 or 8 of the relay. If the former was chosen was then the former must be chosen here aswell.
 * GND of GSM to both Arduino GND & 5V power supply GND
 * PWK of GSM to VCC5.0 of GSM
-* A 100k resistor is also needed between the VCC5.0 & the reset pin
+* A 10k resistor is also needed between the VCC5.0 & the reset pin (It does not matter which way around the resistor is)
 
 #### Testing Connection
 
 * After powering up the GSM, trigger the transistor to reset the GSM for 1-2 seconds. This step is necessary to prevent problems later.
 * Using the GSM Library call the function ‘init()’, if this returns true communication with the device is possible, if it has returned false the device can’t be communicated.
+
+## Checking Firmware
+
+Consult the firmware guide in the repo, software is included.
 
 ## Making a GET Request (HTTP Request)
 
