@@ -2,7 +2,7 @@
 
 This library works for this GSM, it may or may not also work with other modules:
 
-Pin setup has been optimised to work with the 2G FreeStation.
+Pin setup has been optimised to work with the 2G [FreeStation](http://www.freestation.org).
 
 ![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm_small.jpg)
 
@@ -16,9 +16,8 @@ Ensure you have the correct firmware on your GSM, before trying to use features 
 * If in ‘IP GPRSACT’ then running configuration commands such as ‘connectToAPN()’ again will prevent the module from re-entering ‘IP GPRSACT’ state.  (Use Reset Pin solves this)
 * Advisable to reset after powering on using transistor as this prevents problems
 * Some commands take a certain amount of time to complete, receiving OK does not necessarily mean that the command has been completed.
-* <~ 350mA Power (When using functions in this library)
+* Power consumption can spike to around	~700mA, average power use is much lower
 * There are other features in the GSM library which have not been explained here, see files.
-* Even when the GSM is powered off, the LED onboard may still draw power from RX & TX and light up.
 
 ### Recommended Components
 

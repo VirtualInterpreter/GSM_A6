@@ -1,18 +1,16 @@
 #include "GSM_A6.h"
 
 /*
-  �	Baud Rate 9600
-  �	Requires 5V Power
-  �	Only 3.3V logic for RX & TX, doesn't support 5V!!
-  �	If in 'IP GPRSACT' then running configuration commands
+  -	Baud Rate 9600
+  -	Requires 5V Power
+  -	Only 3.3V logic for RX & TX, doesn't support 5V!!
+  -	If in 'IP GPRSACT' then running configuration commands
       again will prevent the module from re-entering 'IP GPRSACT' state.
       (Use Reset Pin solves this)
-  �	Advisable to reset after powering on
-  �	If connecting current directly to VCC5 via an external device,
-      attach the second ground pin to the Arduino
-  �	Some commands take a certain amount of time to complete,
+  -	Advisable to reset after powering on
+  -	Some commands take a certain amount of time to complete,
       receiving OK does not necessarily mean that the command has been completed.
-  �	<~ 300mA Power (When using functions in this library)
+  - Power consumption can spike to around	~700mA, average power use is much lower
 */
 GSM_A6::GSM_A6() : currentMessage(255) { }
 
