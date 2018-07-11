@@ -31,7 +31,7 @@ Ensure you have the correct firmware on your GSM, before trying to use features 
 * 2x Transistor (RS-Code: 806-4548) [Link](https://uk.rs-online.com/web/p/bipolar-transistors/8064548/?sra=pstk)
 
 ### Connecting to GSM A6:
-The GSM Module is wired as followed: (See image folder for pictures, It does not matter which way around resistors are)
+The GSM Module is wired as followed: (See image folder for pictures, it does not matter which way around resistors are)
 
 * Connect VCC5.0 of GSM to PWR of GSM
 * RX of GSM to TX of Arduino
@@ -52,10 +52,11 @@ The GSM Module is wired as followed: (See image folder for pictures, It does not
 * Output side Postive/5v of Step Up Converter to VCC5.0 of GSM
 * A 10k resistor is also needed between the VCC5.0 or PWR to the RST Pin of the GSM
 
-#### Testing Connection
+#### Testing Connections
+Try using some of the example sketches or:
 
 * After powering up the GSM, trigger the transistor to reset the GSM for 1-2 seconds. This step is necessary to prevent problems later.
-* Using the GSM Library call the function ‘init()’, if this returns true communication with the device is possible, if it has returned false the device can’t be communicated.
+* Using the GSM Library call the function ‘init()’, if this returns true communication with the device is possible, if it has returned false the device can’t be communicated with.
 
 ## Checking Firmware
 
