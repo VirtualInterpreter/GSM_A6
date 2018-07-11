@@ -23,23 +23,35 @@ Ensure you have the correct firmware on your GSM, before trying to use features 
 ### Recommended Components
 
 * GSM A6
-* 3V latching relay (EC2-3TNU) [datasheet](https://www.mouser.co.uk/datasheet/2/212/KEM_R7002_EC2_EE2-1104574.pdf)
-* Transistor (KSP44BU)
+* 5V Step Up
+* 2 AA Batteries (2-3.5v combined)
+* 2x 680 Resistor
+* 1x 1K Resistor
+* 2x 10K Resistor
+* MOSFET (RS-Code: 325-7580) [Link](https://uk.rs-online.com/web/p/mosfet-transistors/3257580/?sra=pstk)
+* 2x Transistor (RS-Code: 806-4548) [Link](https://uk.rs-online.com/web/p/bipolar-transistors/8064548/?sra=pstk)
 
 ### Connecting to GSM A6:
-The GSM Module is wired as followed:
+The GSM Module is wired as followed: (See image folder for pictures, It does not matter which way around resistors are)
 
+* Connect VCC5.0 of GSM to PWR of GSM
 * RX of GSM to TX of Arduino
 (The RX and TX pins of the GSM could also be connected to two other digital pins if the SoftwareSerial Library is used, however, the GSM library would have to be modified to use the software serial instead of the normal Serial.)
 * TX of GSM to RX of Arduino
-* RST to Collector of Transistor
-* Base of Transistor to pin 17 (A3) of Arduino (Can be changed as needed)
-* Emitter of Transistor to GND of GSM
-* Using the datasheet of the 3V relay, connect pin 15 (A1) of the arduino to pin 4 or pin 9 of the relay.
-* Likewise connect pin 4 of the arduino to pin 5 or 8 of the relay. If the former was chosen was then the former must be chosen here aswell.
-* GND of GSM to both Arduino GND & 5V power supply GND
-* PWK of GSM to VCC5.0 of GSM
-* A 10k resistor is also needed between the VCC5.0 & the reset pin (It does not matter which way around the resistor is)
+* RST pin of GSM to Collector Pin of first Transistor
+* Base of first Transistor to pin 17 (A3) of Arduino with a 680 Resistor in between
+* Emitter of first Transistor to GND of GSM
+* Base of second Transistor to pin 4 of Arduino with a 680 Resistor in between
+* Collector of second Transistor to GND pin of Arduino
+* Emitter of second Transistor GND of GSM
+* Gate of MOSFET to pin 4 of Arduino with 1k resistor in between
+* 10k Resistor between Gate and Source of MOSFET
+* Drain of MOSFET to Ground Input of Step Up Converter
+* Source of MOSFET to Ground of Power Supply
+* Postive of Power Supply to Postive Input of Step Up Converter
+* Output side Ground of Step Up Converter to GND of GSM
+* Output side Postive/5v of Step Up Converter to VCC5.0 of GSM
+* A 10k resistor is also needed between the VCC5.0 or PWR to the RST Pin of the GSM
 
 #### Testing Connection
 

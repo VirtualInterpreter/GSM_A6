@@ -4,8 +4,8 @@
   �	Baud Rate 9600
   �	Requires 5V Power
   �	Only 3.3V logic for RX & TX, doesn't support 5V!!
-  �	If in �IP GPRSACT� then running configuration commands
-      again will prevent the module from re-entering �IP GPRSACT� state.
+  �	If in 'IP GPRSACT' then running configuration commands
+      again will prevent the module from re-entering 'IP GPRSACT' state.
       (Use Reset Pin solves this)
   �	Advisable to reset after powering on
   �	If connecting current directly to VCC5 via an external device,
@@ -55,7 +55,7 @@ bool GSM_A6::init() {
       myFile.println(F("Preparing"));
     }
   #endif
-
+  
   sendAndWait("&F0"); // Reset Settings
   sendAndWait("E0"); // disable Echo
   sendAndWait("+CMEE=2"); // enable better error messages
@@ -150,7 +150,7 @@ bool GSM_A6::setMobileNetwork(uint8_t networkProvider) {
   } else if (networkProvider == N_THREE) {
     return connectToAPN(F("three.co.uk"), "", "");
   } else if (networkProvider == N_ASDA) {
-    return connectToAPN(F("everywhere"), F("eescure"), F("secure"));
+    return connectToAPN(F("everywhere"), F("eesecure"), F("secure"));
   } else {
     return false;
   }
@@ -173,9 +173,17 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       myFile.println(F("Getting Network Status:"));
     }
     sendAndWait("+CIPSTATUS", "IP INITIAL", 2);
-
+    
     //Attach Network - Page 133 & 136
     if (!sendAndWait("+CGATT=1", 4)) {
+      if (myFile) {
+        myFile.println(F("Failed - Attach Network"));
+      }
+      return false;
+    }
+    delay(1000);
+
+    if (!sendAndWait("+CGATT?", 4)) {
       if (myFile) {
         myFile.println(F("Failed - Attach Network"));
       }
@@ -199,7 +207,7 @@ bool GSM_A6::connectToAPN(const String & apn, const String & username, const Str
       }
       return false;
     }
-    delay(1000);
+    delay(1500); 
 
     //Activate PDP Context - Page 136
     if (!sendAndWait(F("+CGACT=1,1"), 4)) {
@@ -324,7 +332,7 @@ uint8_t GSM_A6::getSignalStrengthRAW() {
       } else if (temp.indexOf("ERROR")) {
         if (temp.indexOf("Excute command failure") > 0) {
           break;
-        } else if (temp.indexOf("invalid command line") > 0) {
+        } else if (temp.indexOf("Unknown error") > 0) {
           break;
         } else if (temp.indexOf("FATAL ERROR") > 0) {
           return 99;
@@ -358,7 +366,7 @@ Quality_Rating GSM_A6::getSignalBitErrorRate() {
       } else if (temp.indexOf("ERROR")) {
         if (temp.indexOf("Excute command failure") > 0) {
           break;
-        } else if (temp.indexOf("invalid command line") > 0) {
+        } else if (temp.indexOf("Unknown error") > 0) {
           break;
         } else if (temp.indexOf("FATAL ERROR") > 0) {
           return 99;
@@ -470,7 +478,7 @@ bool GSM_A6::getRequest(const String & server, const String & resource) {
     }
   #endif
 
-  if (!sendAndWait("+CIPSTART=\"TCP\",\"" + server + "\",80")) {
+  if (!sendAndWait("+CIPSTART=\"TCP\",\"" + server + "\",80", 2)) {
     #if defined( DEBUG_GSM )
       if (myFile) {
         myFile.println(F("Failed"));
@@ -578,20 +586,70 @@ void GSM_A6::stopDebugging() {
 */
 bool GSM_A6::waitForNetwork(unsigned long timeout = 20000L) {
   #if defined( DEBUG_GSM )
-    if (myFile) {
-      myFile.println(F("Connecting To Network..."));
-      if (sendAndWait("+CREG?", "+CREG: 1,1")) {
-        myFile.println(F("Success - Connected"));
-        return true;
-      } else {
-        myFile.println(F("Failed - Not Connected"));
-        return false;
+    if (myFile) myFile.println(F("Connecting To Network..."));
+    
+    uint8_t counter = 0;
+    
+    while (counter < 40) {
+      ++counter;
+
+      sendCommand("+CREG?");
+      long start = millis();
+      while (millis() - start < timeout) {
+        String temp = Serial.readString();
+    
+        if (myFile) captureResponse(temp, start);
+        
+        int indexOf = temp.indexOf("+CREG: 1,1");
+
+        if (indexOf > 0 && isDigit(temp.charAt(indexOf + 10))) {
+          delay(1000);
+          break;
+        } else if (indexOf > 0) {
+          if (myFile) myFile.println(F("Success - Connected"));
+          return true;
+        } else if (temp.indexOf("ERROR") > 0) {
+          Serial.print(F("AT"));
+          Serial.print(GSM_END);
+          Serial.flush();
+          delay(1000);
+          Serial.readString();
+          break;
+        }
       }
-    } else {
-      return sendAndWait("+CREG?", "+CREG: 1,1");
     }
+    
+    if (myFile) myFile.println(F("Failed - Not Connected"));
+    return false;
   #else
-    return sendAndWait("+CREG?", "+CREG: 1,1");
+    
+    uint8_t counter = 0;
+    
+    while (counter < 40) { // 5 seconds
+      ++counter;
+
+      sendCommand("+CREG?");
+      long start = millis();
+      while (millis() - start < timeout) {
+        String temp = Serial.readString();
+    
+        if (temp.indexOf("+CREG: 1,10") > 0) {
+          delay(100);
+          break;
+        } else if (temp.indexOf("+CREG: 1,1") > 0) {
+          return true;
+        } else if (temp.indexOf("ERROR") > 0) {
+          Serial.print(F("AT"));
+          Serial.print(GSM_END);
+          Serial.flush();
+          delay(100);
+          Serial.readString();
+          break;
+        }
+      }
+    }
+    
+    return false;
   #endif
 }
 
@@ -606,24 +664,41 @@ bool GSM_A6::waitForNetwork(unsigned long timeout = 20000L) {
    @return 0 for a fatal error, 1 for a minor error (try resending command),
               2 desired response was recieved from the GSM.
 */
-uint8_t GSM_A6::waitFor(String expected = "OK", unsigned long timeout = 20000L) {
+uint8_t GSM_A6::waitFor(String expected = "OK", unsigned long timeout = 15000L) {
   long start = millis();
   while (millis() - start < timeout) {
     String temp = Serial.readString();
 
-    #if defined( DEBUG_GSM )
-      captureResponse(temp, start);
-    #endif
+  #if defined( DEBUG_GSM )
+    captureResponse(temp, start);
+  #endif
 
     if (temp.indexOf(expected) > 0) {
       return 2;
-    } else if (temp.indexOf("ERROR")) {
+    } else if (temp.indexOf("ERROR") > 0) {
       if (temp.indexOf("Excute command failure") > 0) {
+        Serial.print(F("AT"));
+        Serial.print(GSM_END);
+        Serial.flush();
+        delay(100);
+        Serial.readString();
         return 1;
-      } else if (temp.indexOf("invalid command line") > 0) {
+      } else if (temp.indexOf("Unknown error") > 0) {
+        Serial.print(F("AT"));
+        Serial.print(GSM_END);
+        Serial.flush();
+        delay(100);
+        Serial.readString();
         return 1;
       } else if (temp.indexOf("FATAL ERROR") > 0) {
         return 0;
+      } else {
+        Serial.print(F("AT"));
+        Serial.print(GSM_END);
+        Serial.flush();
+        delay(100);
+        Serial.readString();
+        return 1;
       }
     }
   }
@@ -732,6 +807,9 @@ void GSM_A6::enterSMSContent() {
 void GSM_A6::sendSMS() {
   delay(500);
   Serial.println(char(26));
+  Serial.print(GSM_END);
+  Serial.flush();
+  delay(1000);
 }
 
 /*
@@ -860,7 +938,7 @@ SMS_Message GSM_A6::getSMS(uint8_t messageID) {
     long start = millis();
     while (millis() - start < 20000L) {
       String data = Serial.readStringUntil(',');
-      
+
       #if defined( DEBUG_GSM )
         if (myFile) {
           ++counter;
@@ -878,38 +956,29 @@ SMS_Message GSM_A6::getSMS(uint8_t messageID) {
         newMessage.id = messageID;
         newMessage.status = data.indexOf("UNREAD") > -1 ? 1 : 0;
 
+        Serial.read();
+        data = Serial.readStringUntil(',');
+
         #if defined( DEBUG_GSM )
           if (myFile) {
-            Serial.read();
             myFile.print(F(","));
-            data = Serial.readStringUntil(',');
             myFile.print(data);
           }
-        #else
-          Serial.read();
-          data = Serial.readStringUntil(',');
         #endif
         
         newMessage.sender = "0" + data.substring(4, 14);
 
         // Prints ,, - and any contents present between the comma's
+        Serial.read();
+        data = Serial.readStringUntil(',');
+        Serial.read();
+        
         #if defined( DEBUG_GSM )
           if (myFile) {
-            Serial.read();
             myFile.print(F(","));
-            data = Serial.readStringUntil(',');
             myFile.print(data);
-            Serial.read();
             myFile.print(F(","));
-          } else {
-            Serial.read();
-            Serial.readStringUntil(',');
-            Serial.read();
           }
-        #else
-          Serial.read();
-          Serial.readStringUntil(',');
-          Serial.read();
         #endif
 
         data = Serial.readStringUntil(',');

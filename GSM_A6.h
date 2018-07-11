@@ -75,7 +75,7 @@ public:
   bool waitForNetwork(unsigned long timeout = 20000L);
   bool sendAndWait(const String & command, uint8_t repeatAmountOnMinorError = 2);
   bool sendAndWait(const String & command, const String expected, uint8_t repeatAmountOnMinorError = 2);
-  uint8_t waitFor(const String expected = "OK", unsigned long timeout = 20000L);
+  uint8_t waitFor(const String expected = "OK", unsigned long timeout = 15000L);
   void sendCommand(const String & command);
   void sendAT();
 

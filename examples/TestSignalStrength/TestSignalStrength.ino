@@ -1,8 +1,8 @@
 #include <GSM_A6.h>
 
 /*
-Ensure you are using a GSM with the correct firmware
-and GSM A6 only.
+  Ensure you are using a GSM with the correct firmware
+  and GSM A6 only.
 */
 
 // To enable debugging you must open the GSM_A6.h header file
@@ -12,7 +12,6 @@ and GSM A6 only.
 // much more memory and program space.
 // The GSM_A6.h is normally located in your Arduino libraries
 // For example: Documents/Arduino/libraries/GSM_A6/GSM_A6.h
-
 
 
 #define GSM_GND 4
@@ -27,7 +26,7 @@ void setup() {
   pinMode(GSM_RESET_PIN, OUTPUT);
   pinMode(C_GND, OUTPUT); // Turn on CGND for SD Card access
   digitalWrite(C_GND, HIGH);
-  
+
   while (!Serial) {
     ;
   }
@@ -38,18 +37,57 @@ void setup() {
   Serial.println(F("GSM Is On, Resetting..."));
   resetGSM();
 
-  if (gsm.init()) { // Can causes baud rate to change (Only happens in debug mode)
-    gsm.sendAndWait("OI",2); // Ask for Version Information
+  if (configureGSM()) { // Can causes baud rate to change (Only happens in debug mode)
+    /*
+      EXCELLENT = 0,
+      VERY_GOOD = 1,
+      GOOD      = 2,
+      OKAY      = 3,
+      NOT_GOOD  = 4,
+      VERY_BAD  = 5,
+      UNUSABLE  = 7,
+      NOT_KNOWN = 99,
+    */
+    while (true) {
+      Quality_Rating sg = gsm.getSignalStrength();
+      if (sg == EXCELLENT) {
+        Serial.println("EXCELLENT");
+      } else if (sg == VERY_GOOD) {
+        Serial.println("VERY_GOOD");
+      } else if (sg == GOOD) {
+        Serial.println("GOOD");
+      } else if (sg == OKAY) {
+        Serial.println("OKAY");
+      } else if (sg == NOT_GOOD) {
+        Serial.println("NOT_GOOD");
+      } else if (sg == VERY_BAD) {
+        Serial.println("VERY_BAD");
+      } else if (sg == UNUSABLE) {
+        Serial.println("UNUSABLE");
+      } else {
+        Serial.println(sg);
+      }
+      Serial.println("\r\n");
+      delay(1000);
+    }
+    setGsmOn(false);
+
+    #if defined( DEBUG_GSM )
+      gsm.stopDebugging();
+      gsm.printDebugFile();
+    #endif
+
+    
+  } else {
+    setGsmOn(false);
+    Serial.begin(9600);
+
+    #if defined( DEBUG_GSM )
+      gsm.stopDebugging();
+      gsm.printDebugFile();
+    #endif
+
   }
-
-  setGsmOn(false);
-  Serial.begin(9600);
-  
-  #if defined( DEBUG_GSM )
-    gsm.stopDebugging();
-    gsm.printDebugFile();
-  #endif
-
 }
 
 void loop() {

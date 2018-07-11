@@ -14,12 +14,11 @@ and GSM A6 only.
 // For example: Documents/Arduino/libraries/GSM_A6/GSM_A6.h
 
 
+GSM_A6 gsm = GSM_A6();
 
 #define GSM_GND 4
 #define GSM_RESET_PIN 17
 #define C_GND 14
-
-GSM_A6 gsm = GSM_A6();
 
 void setup() {
   Serial.begin(9600);
@@ -27,24 +26,28 @@ void setup() {
   pinMode(GSM_RESET_PIN, OUTPUT);
   pinMode(C_GND, OUTPUT); // Turn on CGND for SD Card access
   digitalWrite(C_GND, HIGH);
-  
   while (!Serial) {
-    ;
+      ;
   }
-  
+
   Serial.println(F("Switching On..."));
   setGsmOn(true);
 
   Serial.println(F("GSM Is On, Resetting..."));
   resetGSM();
 
-  if (gsm.init()) { // Can causes baud rate to change (Only happens in debug mode)
-    gsm.sendAndWait("OI",2); // Ask for Version Information
+  if (configureGSM()) { // Can causes baud rate to change (Only happens in debug mode)
+    while(true) {
+      readAndReplyAllMessages();
+      gsm.deleteAllSMS();
+      delay(5000);
+    }
+  } else {
+    Serial.println("Failed to configure GSM, check mobile network and connection to arduino");
   }
 
   setGsmOn(false);
-  Serial.begin(9600);
-  
+
   #if defined( DEBUG_GSM )
     gsm.stopDebugging();
     gsm.printDebugFile();
@@ -54,6 +57,48 @@ void setup() {
 
 void loop() {
 
+}
+
+
+/*
+  Loops through all the available SMS Messages on the GSM,
+  returning one SMS message at a time.
+*/
+void readAndReplyAllMessages() {
+  gsm.startMessageCheck();
+  while (gsm.hasNextMessage()) {
+    SMS_Message m1 = gsm.getNextMessage();
+    printMessage(m1);
+    gsm.quickSMS(m1.sender, "29 Degrees, No Sign of Rain");
+  }
+}
+
+/*
+  Prints out an SMS Message
+*/
+void printMessage(SMS_Message &m) {
+
+  Serial.println("Printing SMS Message...");
+  Serial.print("Message ID: ");
+  Serial.println(m.id);
+  Serial.print("Status: ");
+  
+  if (m.status == Message_Status::READ) {
+    Serial.println("Read");
+  } else {
+    Serial.println("Unread");
+  }
+  
+  Serial.print("Time Received: ");
+  Serial.println(m.timeReceived);
+  Serial.print("From: ");
+  Serial.println(m.sender);
+  Serial.println("Message:");
+  Serial.println(m.content);
+
+  Serial.print("\r\n"); // Tells GSM that recent Serial print was not a command
+  delay(100);
+  Serial.readString(); // Now Read input returned by GSM and discard
 }
 
 /*

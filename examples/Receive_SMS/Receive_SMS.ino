@@ -1,21 +1,28 @@
 #include <GSM_A6.h>
 
 /*
-  Ensure you are using a GSM with the correct firmware
-  and GSM A6 only. Debug mode must be active in GSM_A6.h file.
+Ensure you are using a GSM with the correct firmware
+and GSM A6 only.
 */
+
+// To enable debugging you must open the GSM_A6.h header file
+// and uncomment #define DEBUG_GSM on line 10, or comment it 
+// out to disable it. Debug mode requires an SD Card connection
+// and for you to call gsm.stopDebugging(). Using Debug Mode uses
+// much more memory and program space.
+// The GSM_A6.h is normally located in your Arduino libraries
+// For example: Documents/Arduino/libraries/GSM_A6/GSM_A6.h
+
 
 GSM_A6 gsm = GSM_A6();
 
-#define RELAY_GSM_ON 15 // For Relay controlling GSM Power
-#define RELAY_GSM_OFF 4 // For Relay controlling GSM Power
-#define GSM_RESET_PIN 17 // Can be any pin linked to transister
+#define GSM_GND 4
+#define GSM_RESET_PIN 17
 #define C_GND 14
 
 void setup() {
   Serial.begin(9600);
-  pinMode(RELAY_GSM_OFF, OUTPUT);
-  pinMode(RELAY_GSM_ON, OUTPUT);
+  pinMode(GSM_GND, OUTPUT);
   pinMode(GSM_RESET_PIN, OUTPUT);
   pinMode(C_GND, OUTPUT); // Turn on CGND for SD Card access
   digitalWrite(C_GND, HIGH);
@@ -31,18 +38,18 @@ void setup() {
 
   if (configureGSM()) { // Can causes baud rate to change (Only happens in debug mode)
     readAllMessages();
-    gsm.deleteAllReadSMS();
+    gsm.deleteAllSMS();
   } else {
     Serial.println("Failed to configure GSM, check mobile network and connection to arduino");
   }
 
-  gsm.stopDebugging(); // Ensure debug file is closed
   setGsmOn(false);
 
-  Serial.begin(9600);
-  Serial.println("");
-  Serial.println("Finished");
-  gsm.printDebugFile();
+  #if defined( DEBUG_GSM )
+    gsm.stopDebugging();
+    gsm.printDebugFile();
+  #endif
+
 }
 
 void loop() {
@@ -95,15 +102,11 @@ void printMessage(SMS_Message &m) {
 */
 void setGsmOn(bool isOn) {
   if (isOn) {
-    digitalWrite(RELAY_GSM_ON, HIGH);
-    delay(50);
-    digitalWrite(RELAY_GSM_ON, LOW);
+    digitalWrite(GSM_GND, HIGH);
     delay(6000); // GSM Needs to initialise
   } else {
-    digitalWrite(RELAY_GSM_OFF, HIGH);
-    delay(50);
-    digitalWrite(RELAY_GSM_OFF, LOW);
-    delay(1000);
+    digitalWrite(GSM_GND, LOW);
+    delay(100);
   }
 }
 
