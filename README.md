@@ -4,7 +4,7 @@ This library works for this GSM, it may or may not also work with other modules:
 
 Pin setup has been optimised to work with the 2G [FreeStation](http://www.freestation.org).
 
-![Picture of GSM Module](https://github.com/MartinBKings/GSM-A6/blob/master/images/gsm_small.jpg)
+![Picture of GSM Module](https://github.com/VirtualInterpreter/GSM_A6/blob/master/images/gsm_small.jpg)
 
 Ensure you have the correct firmware on your GSM, before trying to use features of it.
 
