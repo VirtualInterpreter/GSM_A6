@@ -42,14 +42,14 @@ The GSM Module is wired as followed: (See image folder for pictures, it does not
 * Emitter of first Transistor to GND of GSM
 * Base of second Transistor to pin 4 of Arduino with a 680 Resistor in between
 * Collector of second Transistor to GND pin of Arduino
-* Emitter of second Transistor GND of GSM
+* Emitter of second Transistor to GND of GSM
 * Gate of MOSFET to pin 4 of Arduino with 1k resistor in between
 * 10k Resistor between Gate and Source of MOSFET
 * Drain of MOSFET to Ground Input of Step Up Converter
 * Source of MOSFET to Ground of Power Supply
-* Postive of Power Supply to Postive Input of Step Up Converter
+* Positive of Power Supply to Positive Input of Step Up Converter
 * Output side Ground of Step Up Converter to GND of GSM
-* Output side Postive/5v of Step Up Converter to VCC5.0 of GSM
+* Output side Positive/5v of Step Up Converter to VCC5.0 of GSM
 * A 10k resistor is also needed between the VCC5.0 or PWR to the RST Pin of the GSM
 
 #### Testing Connections
